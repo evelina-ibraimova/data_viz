@@ -1,0 +1,134 @@
+---
+title: "week2"
+author: "Evelina"
+date: "January 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(maps)
+library(ggmap)
+library(tidycensus)
+library(scales)
+#library(extrafont)
+#library(treemapify) 
+library(tidyr)
+library(forcats)
+#library(janitor)
+#library(devtools)
+library(RColorBrewer)
+
+```
+
+ 
+```{r get data}
+blight <- read_csv("311_Service_Requests_-_Vacant_and_Abandoned_Buildings_Reported.csv") 
+biz <- read_csv("Business_Licenses.csv")
+permits <- read_csv("Building_Permits.csv")
+
+blight <- blight %>%
+  mutate(year = substring(`DATE SERVICE REQUEST WAS RECEIVED`, 7, 10)) 
+
+biz <- biz %>%
+  mutate(year = substring(`LICENSE TERM START DATE`, 7, 10))
+
+```
+
+
+```{r map}
+
+blight18 <- filter(blight, year == "2018")
+
+biz18 <- filter(bizy, `APPLICATION TYPE` == "ISSUE" & year == "2018" |
+                  `APPLICATION TYPE` == "C_LOC" & year == "2018")
+
+chi_bb <- c(left = -87.936287,
+            bottom = 41.679835,
+            right = -87.447052,
+            top = 42.000835)
+
+chi <- get_stamenmap(bbox = chi_bb,
+                                zoom = 11)
+
+(map_reported_abandoned_buildings <- 
+  ggmap(chi) +
+  geom_point(data = blight18,
+             mapping = aes(x = LONGITUDE,
+                           y = LATITUDE), 
+             alpha = 0.1,
+             size = 0.8,
+             color = "red") +
+  geom_point(data = biz18,
+             mapping = aes(x = LONGITUDE,
+                           y = LATITUDE), 
+             alpha = 0.09,
+             size = 0.8,
+             color = "green") +
+    theme(axis.ticks = element_blank(), 
+          axis.text.x = element_blank(),
+          axis.text.y = element_blank(),
+        title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(face = "plain", size = 10),
+        plot.caption = element_text(size = 8, face = "plain", color = "#6B6E6F", hjust = 0)) +
+     labs(x = "", y = "", 
+       title = "South of Chicago is plagued by urban blight,\nhas lower economic activity",
+       subtitle = "In 2018, most of the vacant and abandoned buildings (red) were reported \nin the South of the city. Notably, there is not much overlap with new economic activity,\nas measured by new business license applications (green)",
+       caption = "Source: 311 Service Requests - Vacant and Abandoned Buildings Reported, 2018, Chicago Data Portal, City of Chicago")) 
+
+ggsave("map_reported_abandoned_buildings.png")
+
+```
+
+
+```{r time series}
+blight_summary <- blight %>%
+  mutate(comm = as.character(`Community Area`)) %>%
+  group_by(comm, year) %>%
+  summarize(n = n())
+
+(time_series_abandoned_buildings <- ggplot(blight_summary) +
+  geom_line(data = blight_summary, mapping = aes(x = year, y = n, group = comm), color = "grey") +
+  theme(panel.background = element_blank(), 
+        panel.grid.major.y = element_line(size = 0.05, color = "gray", linetype = "solid"), 
+        axis.ticks = element_blank(), 
+        title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(face = "plain", size = 11),
+        axis.title.y = element_text(size = 9, face = "plain"),
+        plot.caption = element_text(size = 8, face = "plain", color = "#6B6E6F", hjust = 0)) +
+  labs(x = "", y = "Number of buildings reported \nas vacant or abandoned", 
+       title = "Great Depression may have caused much of the vacancy",
+       subtitle = "For nearly every community area, the number of buildings reported vacant or abandoned \npeaked in 2011 and has been declining since and has yet to reach its pre-recession level",
+       caption = "Source: 311 Service Requests - Vacant and Abandoned Buildings Reported, 2018, City of Chicago Data Portal"))
+
+ggsave("time_series_abandoned_buildings.png")
+
+```
+
+```{r permits}
+permits <- permits %>%
+  mutate(year = substring(ISSUE_DATE, 7, 10)) %>%
+  filter(year >= "2008" & year <= 2018) %>% 
+  filter(PERMIT_TYPE == "PERMIT - RENOVATION/ALTERATION" | PERMIT_TYPE == "PERMIT - NEW CONSTRUCTION")
+
+(barchart_permits <- ggplot(permits) +
+  geom_bar(aes(x = year, fill = PERMIT_TYPE)) +
+  theme(panel.background = element_blank(), 
+        panel.grid.major.y = element_line(size = 0.05, color = "gray", linetype = "solid"),
+        axis.ticks = element_blank(),
+        legend.title = element_text(face = "bold", size = 9),
+        title = element_text(face = "bold", size = 14),
+        axis.title.y = element_text(face = "plain", size = 8),
+        plot.subtitle = element_text(face = "plain", size = 11),
+        plot.caption = element_text(size = 8, face = "plain", color = "#6B6E6F", hjust = 0)) +
+     labs(x = "", y = "Number of new construction permits issued", 
+       title = "Construction acitivity fell in the wake of Great Depression",
+       subtitle = "The number of permits issued in Chicago for both new construction and renovations \n and alterations plummeted in the wake of the Great Depression but bounced back to \n pre-recession level in 2016",
+       fill = "Type of permit",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago")) 
+
+ggsave("barchart_permits.png")
+
+```
+
