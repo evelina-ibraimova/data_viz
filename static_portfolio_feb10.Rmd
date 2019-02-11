@@ -1,0 +1,685 @@
+---
+title: "Static Portfolio"
+author: "Evelina"
+date: "February 10, 2019"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+list.of.packages <- c("ggplot2", "tidyverse", "ggmap", "extrafont", "tidyr", "dplyr", "forcats", "sp", "sf", "rgdal", "maptools", "rgeos", "scales", "ggrepel", "treemapify", "sf", "stringr")
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(ggmap)
+library(ggrepel)
+library(extrafont)
+library(treemapify) 
+library(tidyr)
+library(dplyr)
+library(forcats)
+library(sp)
+library(rgdal)
+library(maptools)
+library(rgeos)
+library(scales)
+library(sf)
+#if (!require(gpclib)) install.packages("gpclib", type="source")
+#gpclibPermit()
+
+#install.packages('rgeos', type='source')
+#install.packages('rgdal', type='source')
+
+#font_import()
+
+```
+
+## Intro
+
+```{r get data, message=FALSE, warning=FALSE}
+#blight <- read_csv("311_Service_Requests_-_Vacant_and_Abandoned_Buildings_Reported.csv") 
+#biz <- read_csv("Business_Licenses.csv")
+#permits <- read_csv("Building_Permits.csv")
+
+#blight <- blight %>%
+#  mutate(year = substring(`DATE SERVICE REQUEST WAS RECEIVED`, 7, 10))
+#write.csv(blight, "blight.csv")
+#blight <- read.csv("blight.csv")
+
+#biz <- biz %>%
+#  mutate(year = substring(`LICENSE TERM START DATE`, 7, 10))
+#write.csv(biz, "biz.csv")
+#biz <- read.csv("biz.csv")
+
+purple_green_cat <- c("#680A4D", "#A78F08", "#005A5B", "#11A6A7", "#8E7A0E")
+red_blue_cat <- c("#68120A", "#CFDB59", "#1157A7", "#002B5B", "#7B8E0E")
+ocean_cont <- c("#206969", "#2C9191", "#4F8282", "#6EB5B5", "#103636")
+
+theme_evelina <- theme(panel.background = element_rect("#EBF1DE"),
+        plot.background = element_rect(fill = "#EBF1DE"),
+        legend.background = element_rect(fill = "#EBF1DE"),
+        axis.ticks = element_blank(), 
+        text = element_text(face = "plain", size = 11, family = "Bodoni MT"),
+        plot.title = element_text(face = "bold", size = 26, color = "#303030", family = "Bodoni MT Condensed"),
+        plot.subtitle = element_text(face = "plain", size = 14),
+        legend.title = element_text(face = "bold", size = 9),
+        plot.caption = element_text(size = 8, face = "plain", color = "#6B6E6F", hjust = 1),
+        axis.title = element_text(face = "plain", size = 11),
+        axis.text = element_text(face = "plain", size = 10),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(face = "plain", size = 10),
+        panel.grid.major.y = element_line(size = 0.7, color = "gray", linetype = "dotted"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "right") 
+
+ 
+```
+
+Research points to evidence that urban blight is bad for cities. It is associated with increased crime and seems to affect physical and emotional health of people residing near abandoned buildings. Visualizations below illustrate which parts of Chicago have been affected and explore relationships between blight and economic activity.
+
+##1 
+```{r map, message=FALSE, warning=FALSE, fig.width=9,fig.height=7}
+
+#blight18 <- filter(blight, year == "2018")
+#write.csv(blight18, "blight18.csv")
+blight18 <- read.csv("blight18.csv")
+
+#biz18 <- filter(biz, `APPLICATION TYPE` == "ISSUE" & year == "2018" |
+#                  `APPLICATION TYPE` == "C_LOC" & year == "2018")
+#write.csv(biz18, "biz18.csv")
+biz18 <- read.csv("biz18.csv")
+
+chi_bb <- c(left = -87.936287,
+            bottom = 41.679835,
+            right = -87.447052,
+            top = 42.000835)
+
+chi2 <- get_stamenmap(bbox = chi_bb,
+                                zoom = 11, color = "bw",
+                      maptype = "toner-lite")
+
+map_reported_abandoned_buildings_old <- 
+  ggmap(chi2) +
+  geom_point(data = blight18,
+             mapping = aes(x = as.numeric(LONGITUDE),
+                           y = as.numeric(LATITUDE)), 
+             alpha = 0.15,
+             size = 0.8,
+             color = "#680A4D") +
+  geom_point(data = biz18,
+             mapping = aes(x = as.numeric(LONGITUDE),
+                           y = as.numeric(LATITUDE)), 
+             alpha = 0.15,
+             size = 0.8,
+             color = "#005A5B") +
+      labs(x = "", y = "", 
+      title = "South of Chicago is plagued by urban blight,\nhas lower economic activity",
+      subtitle = "",
+      caption = "Source: 311 Service Requests - Vacant and Abandoned Buildings Reported, 2018, Chicago Data Portal, City of Chicago") +
+  annotate(geom = "text", x = -87.6, y = 41.92, label = "New economic activity,\nas measured by 2018\nbusiness license applications \n(in green)",
+              color="black", size = 3, hjust = 0) +
+  annotate(geom = "text", x = -87.57, y = 41.82, label = "Most of the \nvacant and abandoned\nbuildings were reported\nin 2018 in the South Side\n(in purple)",
+              color="black", size = 3, hjust = 0) +
+  theme_evelina +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank())
+
+#######
+
+comm_shapes2 <- st_read("comm_shapes.shp")
+
+#install.packages("rlang", type = "source")
+#install.packages("devtools")
+#library(devtools)
+#devtools::install_github("tidyverse/ggplot2")
+#require(ggplot2)
+
+(map_reported_abandoned_buildings <- ggplot() + 
+  geom_sf(data = comm_shapes2, size = 0.5, color = "gray") + 
+  #ggtitle("AOI Boundary Plot") + 
+  coord_sf() +
+  geom_point(data = blight18,
+             mapping = aes(x = as.numeric(LONGITUDE),
+                           y = as.numeric(LATITUDE)), 
+             alpha = 0.15,
+             size = 0.8,
+             color = "#680A4D") +
+  geom_point(data = biz18,
+             mapping = aes(x = as.numeric(LONGITUDE),
+                           y = as.numeric(LATITUDE)), 
+             alpha = 0.15,
+             size = 0.8,
+             color = "#005A5B") +
+      labs(x = "", y = "", 
+      title = "\nSouth of Chicago is plagued by urban blight, \nhas lower economic activity",
+      subtitle = "",
+      caption = "Source: 311 Service Requests - Vacant and Abandoned Buildings Reported, \n2018, Chicago Data Portal, City of Chicago") +
+  annotate(geom = "text", x = -87.6, y = 41.92, label = "New economic activity,\nas measured by 2018\nbusiness license applications \n(in green)",
+              color="black", size = 3, hjust = 0, family = "Bodoni MT") +
+  annotate(geom = "text", x = -87.56, y = 41.82, label = "Most of the \nvacant and abandoned\nbuildings were reported\nin 2018 in the South Side\n(in purple)",
+              color="black", size = 3, hjust = 0, family = "Bodoni MT") +
+  theme_evelina +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  expand_limits(x = -87.35))
+
+#ggsave("map_reported_abandoned_buildings.png", width = 9, height = 7)
+
+```
+
+Urban blight is predominantly affecting areas in the South and West parts of Chicago, as shown on the map above. Notably, there is not much overlap between concentrations of vacant and abandoned buildings and economic activity, as measured by newly-issued business licenses. 
+
+##2
+```{r message=FALSE, warning=FALSE}
+
+#blight_summary <- blight %>%
+#  mutate(comm = as.character(`Community Area`)) %>%
+#  filter(year >= 2010) %>%
+#  group_by(comm, year) %>%
+#  summarize(n = n())
+#write.csv(blight_summary, "blight_summary.csv")
+blight_summary <- read.csv("blight_summary.csv")
+
+blight18_sum <- blight_summary %>% 
+  filter(year == 2018 & comm >= 1) %>%
+  mutate(comm_number = as.numeric(comm))
+  
+comm_crosswalk <- read_csv("comm_crosswalk.csv") 
+
+permits_cons <- read.csv("permits_cons.csv")
+
+permits_comms_summary <- read.csv("permits_comms_summary.csv")
+
+permit_cost <- permits_comms_summary %>%
+  filter(year == 2018 & area != 0) %>%
+  group_by(large_area, area, comm_name) %>%
+  summarize(npermits = n(), cost = round(sum(ESTIMATED_COST) / 1000000000, 2)) %>%
+  arrange(desc(cost))
+
+joined <- left_join(comm_crosswalk, permit_cost, by = "comm_name")
+joined2 <- left_join(joined, blight18_sum, by = "comm_number")
+
+(blight_construction_heat <- ggplot(joined2, aes(n, npermits)) +
+  stat_bin2d(aes(fill = stat(count))) +
+  theme_evelina +  
+  scale_fill_gradient(low = "#6EB5B5", high = "#103636") +
+     labs(x = "Number of vacant of abandoned buildings reported in 2018", 
+          y = "Number of new construction \nand renovation permits in 2018", 
+          fill = "Number of \ncommunity areas",
+       title = "\nThere is a negative relationship between \nconstruction and urban blight",
+       subtitle = "",
+       caption = "Source: Building Permits and 311 Service Requests - Chicago Data Portal, City of Chicago") +
+    annotate(geom = "text", x = 85, y = 650, label = "Most of community areas have \nlow urban blight and \nlow construction activity", family = "Bodoni MT", size = 2.5, hjust = 0) +
+    annotate(geom = "text", x = 45, y = 1100, label = "High construction activity, \nlow blight", family = "Bodoni MT", size = 2.5, hjust = 0) +
+    annotate(geom = "text", x = 215, y = 350, label = "Low construction activity, \nhigh blight", family = "Bodoni MT", size = 2.5, hjust = 0) +
+    geom_segment(aes(x = 40, y = 270, xend = 75, yend = 550, group = 1), color = "gray"))
+
+ggsave("blight_construction_heat.png")
+
+```
+
+It seems that there is also a negative relationship between construction activity and urban blight. Most of community areas in Chicago area are relatively low both on blight and new construction. If we take a closer look, however, a clear pattern emerges: construction is booming in the areas with minimal blight and is not happening in the areas disproportionately affected by blight. 
+
+##3
+```{r message=FALSE, warning=FALSE}
+
+#permits_cons <- permits %>%
+#  mutate(year = substring(ISSUE_DATE, 7, 10)) %>%
+#  filter(year >= "2008" & year <= 2018) %>% 
+#  filter(PERMIT_TYPE == "PERMIT - RENOVATION/ALTERATION" | PERMIT_TYPE == "PERMIT - NEW #CONSTRUCTION")
+#write.csv(permits_cons, "permits_cons.csv")
+
+#turn into spatial points dataframe
+permits_cons_map <- permits_cons %>% drop_na(LONGITUDE)
+coordinates(permits_cons_map) <- c("LONGITUDE", "LATITUDE") 
+
+#read in shapefiles
+comm_shapes <- readOGR(".", "comm_shapes")
+
+proj4string(permits_cons_map) <- proj4string(comm_shapes)
+
+# combine is.na() with over() to do the containment test
+inside.comm <- !is.na(over(permits_cons_map, as(comm_shapes, "SpatialPolygons")))
+
+permits_cons_map$comm_name <- over(permits_cons_map, comm_shapes)$community
+
+permits_comms <- as.data.frame(permits_cons_map) %>%
+  select(LONGITUDE, LATITUDE, comm_name, PERMIT_TYPE, ISSUE_DATE, ESTIMATED_COST)
+
+permits_comms_summary <- permits_comms %>%
+  mutate(year = substring(`ISSUE_DATE`, 7, 10),
+         area = ifelse(comm_name %in% 
+                         c("NEAR NORTH SIDE", "NEAR SOUTH SIDE", "LOOP"), "Central", 
+                       ifelse(comm_name %in%
+                                c("NORTH CENTER", "LAKE VIEW", "LINCOLN PARK", "AVONDALE", "LOGAN SQUARE"), "North Side", 
+                              ifelse(comm_name %in%
+                                       c("ROGERS PARK", "WEST RIDGE", "UPTOWN", "LINCOLN SQUARE", "EDISON PARK", "NORWOOD PARK", "JEFFERSON PARK", "FOREST GLEN", "NORTH PARK", "ALBANY PARK", "EDGEWATER", "OHARE"), "Far North",
+                                     ifelse(comm_name %in%
+                                              c("PORTAGE PARK", "IRVING PARK", "DUNNING", "MONTCLARE", "BELMONT CRAGIN", "HERMOSA"), "Northwest", 
+                                            ifelse(comm_name %in%
+                                                     c("HUMBOLDT PARK", "WEST TOWN", "AUSTIN", "WEST GARFIELD PARK", "EAST GARFIELD PARK", "NEAR WEST SIDE", "NORTH LAWNDALE", "SOUTH LAWNDALE", "LOWER WEST SIDE"), "West Side", 
+                                                   ifelse(comm_name %in%
+                                                            c("ARMOUR SQUARE", "DOUGLAS", "OAKLAND", "FULLER PARK", "GRAND BOULEVARD", "KENWOOD", "WASHINGTON PARK", "HYDE PARK", "WOODLAWN", "SOUTH SHORE", "BRIDGEPORT", "GREATER GRAND CROSSING"), "South Side",
+                                                          ifelse(comm_name %in%
+                                                                   c("GARFIELD RIDGE", "ARCHER HEIGHTS", "BRIGHTON PARK", "MCKINLEY PARK", "NEW CITY", "WEST ELSDON", "GAGE PARK", "CLEARING", "WEST LAWN", "CHICAGO LAWN", "WEST ENGLEWOOD", "ENGLEWOOD"), "Southwest Side", 
+                                                                     ifelse(comm_name %in%
+                                                                              c("CHATHAM", "AVALON PARK", "SOUTH CHICAGO", "BURNSIDE", "CALUMET HEIGHTS", "ROSELAND", "PULLMAN", "SOUTH DEERING", "EAST SIDE", "WEST PULLMAN", "RIVERDALE", "HEGEWISCH"), "Far Southeast side", 
+                                                                                ifelse(comm_name %in%
+                                                                                         c("ASHBURN", "AUBURN GRESHAM", "BEVERLY", "WASHINGTON HEIGHTS", "MONTH GREENWOOD", "MORGAN PARK"), "Far Southwest side", 0))))))))),
+         large_area = ifelse(area %in% c("Far Southwest side", "Far Southeast side", "South Side"), "South", 
+         ifelse(area %in% c("West Side", "Southwest Side", "Northwest"), "West", 
+                ifelse(area %in% c("North Side", "Far North"), "North", "Central"))))
+
+#write.csv(permits_comms_summary, "permits_comms_summary.csv")
+
+(construction_facets <- permits_comms_summary %>%
+  filter(year >= 2006 & year <= 2018 & area != 0) %>%
+  group_by(year, area) %>%
+  summarize(n = n()) %>%
+  ggplot() +
+  geom_area(mapping = aes(x = year, y = n), group = 1, fill = "#2C9191", alpha = 0.5) +
+  facet_wrap(~area, ncol = 3) +
+  theme_evelina +
+     labs(x = "", y = "\nNumber of new construction and renovation\npermits", 
+       title = "\nConstruction activity varies across the city",
+       subtitle = "The number of permits issued in Chicago for new construction, renovations \nplummeted in the wake of the Great Depression but bounced back \nto pre-recession level by 2018",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago") +
+    scale_x_discrete(breaks = c("2006", "2008", "2010", "2012", "2014", "2016", "2018"),
+                                labels = c("2006", "2008", "2010", "2012", "2014", "2016", "2018")) +
+    theme(axis.text = element_text(size = 7)))
+
+ggsave("construction_facets.png")
+```
+
+There is substantial heterogeneity in construction activity by city area. Central business district, West side and North side have had construction booming for the last several years, while areas further away from downtown have seen development on a lower scale. Notably, construction activity - as measured in building permits for new construction and renovations - plummeted in the wake of the Great Depression but has practically bounced back up to the pre-recession level across the city.
+
+##4
+```{r time series, message=FALSE, warning=FALSE}
+
+blight_summary_highlight <- 
+  filter(blight_summary, comm %in% c("67","68","25", "49", "46", "71"))
+
+blight_summary_highlight2 <- filter(blight_summary_highlight, year == "2013")
+
+(time_series_blight <- ggplot(blight_summary) +
+  geom_line(data = blight_summary, mapping = aes(x = year, y = n, group = as.character(comm)), color = "#4F8282") +
+    geom_line(data = blight_summary_highlight, mapping = aes(x = year, y = n, group = as.character(comm)), color = "#680A4D") +
+  theme_evelina +
+  labs(x = "", y = "\nNumber of buildings reported \nas vacant or abandoned", 
+       title = "\nUrban blight is concentrated and persistent",
+       subtitle = "A handful of community areas account for disproportionate share of \nChicago's urban blight. The leaders of the ranking have not changed \nsince 2011, are in South and West of the city",
+       caption = "Source: 311 Service Requests, 2018, City of Chicago Data Portal") +
+    annotate(geom = "text", x = 2015, y = 900, label = "The good news is,\nfor nearly every community area, \nthe number of buildings \nreported vacant or abandoned \nhas been declining since 2011", color="black", size = 3.2, hjust = 0, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2012, y = 1200, label = "West Engelwood", color="black", size = 2.5, hjust = 0.1, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2013, y = 800, label = "Engelwood", color="black", size = 2.5, hjust = 0.6, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2011, y = 930, label = "Austin", color="black", size = 2.5, hjust = -0.02, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2011, y = 300, label = "Auburn Gresham", color="black", size = 2.5, hjust = -0.65, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2011, y = 750, label = "Roseland", color="black", size = 2.5, hjust = -0.35, family = "Bodoni MT") +
+    annotate(geom = "text", x = 2015, y = 160, label = "South Chicago", color="black", size = 2.5, hjust = 0.5, family = "Bodoni MT"))
+
+ggsave("time_series_blight.png")
+
+```
+
+A deeper analysis of urban blight over time reveals an important insight: community areas that had lots of blight reported in 2010 and 2011 continued to lead the ranking of affected areas all the way through 2018. At the same time, the problem has become less urgent as the city recovers from the Great Depression - nearly all of the community areas had urban blight declining since the 2011 peak.
+
+##5
+```{r message=FALSE, warning=FALSE, fig.width=7,fig.height=8}
+
+#permit_cost <- permits_comms_summary %>%
+#  filter(year == 2018 & area != 0) %>%
+#  group_by(area, comm_name) %>%
+#  summarize(npermits = n(), cost = round(sum(ESTIMATED_COST) / 1000000000, 2)) %>%
+#  arrange(desc(cost))
+
+options(scipen = 999)
+
+(construction_investment_bubble <- ggplot() +
+  geom_point(data = permit_cost, mapping = aes(x = npermits, y = cost, size = cost, color = large_area)) +
+  theme_evelina + 
+  scale_size_continuous(name = "Estimated cost \nof new construction and \nrenovation investment \nin 2018 (bn $)") +
+  scale_color_manual(name = "Area of the city", values = purple_green_cat) +
+  labs(x = "\nNumber of new construction and renovation permits in 2018",
+          y = "\nEstimated cost of new \nconstruction and renovation investment in 2018 (bn $)", 
+       title = "\nA handful of downtown areas accounted for \na lion's share of construction investment in 2018",
+       color = "",
+       subtitle = "",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago") +
+    annotate(geom = "text", x = 1000, y = 1.42, label ="The Loop - \ncentral business \ndistrict of the city", hjust = 0, size = 2.5, family = "Bodoni MT") +
+    annotate(geom = "text", x = 130, y = 0.90, label ="Near West Side and West Town \nhave grown rapidly in the \npast decade. The areas \nnow host some of the best \nrestaurants and bars in the city, \nare becoming increasingly attractive \nfor wealthy millenials", hjust = 0, size = 2.5, family = "Bodoni MT") +
+    annotate(geom = "text", x = 750, y = 0.9, label ="Near North Side is one of the key \nentertainment districts of the city, \nhosting Navy Pier, Magnificent Mile, \nRiver North, and Old Town with all their \ndining, shopping, and partying \nestablishments", hjust = 0, size = 2.5, family= "Bodoni MT") +
+    annotate(geom = "text", x = 50, y = 0.4, label ="High investment in Woodlawn \non the South Side may be \nexplained by the University of Chicago \ndorm expansion", hjust = 0, size = 2.5, family = "Bodoni MT") +
+    annotate(geom = "text", x = 800, y = 0.19, label ="North Side is seeing much\n contruction as well in \nLake View, Lincoln Park, \nAvondale, and Logan Square", hjust = 0, size = 2.5, family = "Bodoni MT") +
+    geom_segment(aes(x = 520, y = 1.1, xend = 610, yend = 1.25, group = 1)) +
+    geom_segment(aes(x = 450, y = 0.7, xend = 580, yend = 0.35, group = 1)) +
+    geom_segment(aes(x = 510, y = 0.19, xend = 750, yend = 0.19, group = 1)) +
+    theme(plot.caption = element_text(hjust = 2)))
+
+ggsave("construction_investment_bubble.png", width = 7, height = 8)
+
+```
+
+Number of building permits is only one way of measuring construction activity. Looking at number of building permits in combination with the estimated construction costs adds color to the picture. For example, we now see that even though there were more permits issued in Near North Side, more funds were invested in construction in Near West Side in 2018. Similarly, we notice that Woodlawn boasts high investment despite being far from the top by the number of permits issued. This may be explained by several large University of Chicago projects underway in the area.
+
+##6
+```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+
+inv_by5y <- permits_comms_summary %>%
+  filter(!is.na(comm_name)) %>%
+   mutate(five_year = ifelse(year %in% c("2004", "2005", "2006", "2007", "2008", "2009"), "2004-2008",
+                             ifelse(year %in% c("2009", "2010", "2011", "2012", "2013"), "2009-2013", 
+                                    ifelse(year %in% c("2014", "2015", "2016", "2017", "2018"), "2014-2018", 0)))) %>%
+  filter(five_year != 0) 
+
+inv_by5y_bycomm <- inv_by5y %>%
+  group_by(five_year, comm_name) %>%
+  summarize(total_cost = sum(ESTIMATED_COST)/1000000000) 
+ 
+ rank15y <-  inv_by5y_bycomm %>% group_by(comm_name) %>% 
+  summarize(total_cost_15y = sum(total_cost)) %>%
+  arrange(desc(total_cost_15y)) %>%
+  head(15)
+ 
+ inv_by5y_bycomm <- left_join(rank15y, inv_by5y_bycomm, by = "comm_name")
+ 
+ (const_decade_lollipop <- inv_by5y_bycomm %>%
+   arrange(desc(total_cost)) %>%
+  #mutate(comm_name = factor(comm_name, levels = .$comm_name)) %>%
+  ggplot(aes(total_cost, reorder(comm_name, total_cost))) +
+   geom_boxplot() +
+        geom_segment(aes(x = 0, y = comm_name,
+                         xend = total_cost, yend = comm_name)) +
+        geom_point(aes(color = five_year)) +
+   facet_wrap(~five_year) +
+   scale_color_manual(values = purple_green_cat) +
+  #geom_text(aes(x = total_cost, y = comm_name, label = round(total_cost,1)), nudge_x = 0.5, nudge_y = 0.1, family = "Bodoni MT", size = 2) +
+  theme_evelina +
+   theme(axis.text = element_text(size = 6), plot.title = element_text(hjust = 0), legend.position = "bottom") +
+   labs(x = "\nCumulative investment in construction and renovation 2004-2018 ($ bn),\nover 5-year periods",
+          y = "", 
+       title = "\nLooking at cumulative construction investment\nover the last 15 years reveals emerging hot areas",
+       color = "",
+       subtitle = "",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago"))
+
+ggsave("const_decade_lollipop.png", width = 8, height = 6)
+
+
+```
+
+It looks like in the last five years, construction investment has been shifting from the Loop and Near North Side - the central business district and the adjacent area hosting some of the key tourist attractions and entertanment establishments - to the neighbourhoods around them, especially to the north and west. The place of O'Hare in the ranking decreased, reflecting no significant recent investments in the airport.
+
+##7
+```{r fig.height=10, fig.width=7, message=FALSE, warning=FALSE}
+biz <- read.csv("biz.csv")
+
+#turn into spatial points dataframe
+biz_map <- biz %>% drop_na(LONGITUDE) %>%
+  mutate(app_type = APPLICATION.TYPE,
+         term_start_date = LICENSE.TERM.START.DATE, biz_act = BUSINESS.ACTIVITY, license_descr = LICENSE.DESCRIPTION)
+
+coordinates(biz_map) <- c("LONGITUDE", "LATITUDE") 
+
+#read in shapefiles
+comm_shapes <- readOGR(".", "comm_shapes")
+
+proj4string(biz_map) <- proj4string(comm_shapes)
+
+# combine is.na() with over() to do the containment test
+inside.comm <- !is.na(over(biz_map, as(comm_shapes, "SpatialPolygons")))
+
+biz_map$comm_name <- over(biz_map, comm_shapes)$community
+
+biz_comms <- as.data.frame(biz_map) %>%
+  select(ID, LONGITUDE, LATITUDE, comm_name, CITY, license_descr, biz_act,
+         app_type, term_start_date,
+         year, SSA) %>%
+  filter(CITY %in% c("CHICAGO", "CHIICAGO", 
+                     "CHICAGP", "CHCIAGO", "CHCAGO")) %>%
+  filter(app_type %in% c("ISSUE", "C_LOC"))
+
+biz_comms_decade <- biz_comms %>% 
+  group_by(year, comm_name) %>%
+  summarize(nlicenses = n()) %>%
+  filter(year %in% c("2008", "2013", "2018")) %>%
+  filter(!is.na(comm_name)) %>%
+  left_join(permit_cost, by = "comm_name") %>%
+  group_by(year, large_area, area) %>%
+  summarize(nlicenses_area = sum(nlicenses)) %>%
+  spread(key = year, value = nlicenses_area) %>%
+  #gather(key = "year", value = "nlicenses_area", "2008":"2018") %>%
+  drop_na(area) 
+
+#biz_comms_decade %>% arrange(desc(nlicenses_area))
+
+y13 = 2013
+now <- 2018
+label08 <- paste(biz_comms_decade$area, comma_format()(round(biz_comms_decade$`2008`)), sep="\n")
+label13 <- paste(biz_comms_decade$area, comma_format()(round(biz_comms_decade$`2013`)), sep="\n")
+label18 <- paste(biz_comms_decade$area, comma_format()(round(biz_comms_decade$`2018`)), sep="\n")
+
+(business_slopes <- biz_comms_decade %>% 
+  ggplot() +
+  geom_segment(data = biz_comms_decade, aes(x = 2008, xend = 2018, 
+                   y = `2008`, yend =`2018`, color = large_area), size = 1.2) +
+  scale_color_manual(values = purple_green_cat) +
+  #geom_segment(aes(x = y13, xend = now, 
+                   #y = `2013`, yend =`2018`)) +
+  theme_evelina +
+  theme(axis.text.y = element_blank(), panel.grid.major.y = element_blank(), legend.position = "bottom") +
+  #geom_point() +
+  geom_text_repel(label = label08, y = biz_comms_decade$`2008`, x = 2008, 
+            hjust = 0.5, vjust = 1, size = 3, family = "Bodoni MT") +
+  geom_text_repel(label = label18, y = biz_comms_decade$`2018`, x = 2018, 
+            hjust = -0.5, vjust = 1, size = 3, family = "Bodoni MT") +
+  labs(x = "", y = "\n", 
+       title = "\nNew business activity seems to be shifting from \nthe center of Chicago to surrounding areas",
+       color = "",
+       subtitle = "Despite the general trend of reduction in new business license applications -\n which may be a result of the Great Depression and a recent deregulation - \nthere is visible heterogeneity among the different areas",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago") +
+    expand_limits(x = c(2007.5, 2017.5)) +
+    scale_x_continuous(breaks = c(2008, 2018), labels = c("2008", "2018")))
+  
+ggsave("business_slopes.png", width = 7, height = 10)
+```
+
+The number of applications for business licenses has fallen in Chicago across the board from 2008 to 2018. One reason could be a recent business license reform that took place in 2013, reducing the number of businesses that needed licenses to operate. 
+
+At the same time, it is apparent that there is significant heterogeneity among different parts of the city. Once again - now in terms of business licenses - we see the bulk of economic activity happenning downtown but gradually shifting from the very central part of Chicago to its immediate surroundings, especially in the West.
+
+
+```{r eval=FALSE, include=FALSE}
+
+######
+comm_shapes1 <- readOGR(".", "comm_shapes")
+
+comm_shapes1@data$id = rownames(comm_shapes1@data)
+  comm_shapes1.points = fortify(comm_shapes1, region="id")
+  comm_shapes1.df = full_join(comm_shapes1.points, comm_shapes1@data, by="id")
+  
+comm_crosswalk1 <- 
+  comm_crosswalk %>% mutate(id = comm_number)
+
+permit_cost1 <- 
+  left_join(permit_cost, comm_crosswalk1, by = "comm_name") %>% 
+  mutate(id = as.character(comm_number))
+
+comm_shapes1.df <- left_join(comm_shapes1.df, permit_cost1, by = "id") 
+ 
+ggplot(data = comm_shapes1.df,
+              aes(x = long, y = lat, group = group)) + 
+  geom_polygon(data = comm_shapes1.df, aes(fill = cost)) +
+  scale_fill_gradient(low = "#A78F08", high = "#680A4D") +
+  theme_evelina +
+  theme(axis.ticks = element_blank(), axis.text = element_blank()) +
+  labs(x = "", y = "", 
+       title = "\nConstruction activity patterns are changing",
+       color = "",
+       subtitle = "The hotspots in 2018 include West Town and Woodlawn community areas and \nenjoy triple of the average activity in the rest of the city",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago")
+  
+
+#680A4D", "#A78F08", "#005A5B", "#11A6A7", "#8E7A0E"
+
+######## 2008-2018
+permit_cost2 <- permits_comms_summary %>%
+  filter(year >=2008 & area != 0) %>%
+  group_by(large_area, area, comm_name) %>%
+  summarize(npermits = n(), cost = round(sum(ESTIMATED_COST) / 1000000000, 2)) 
+
+permit_cost2 <- left_join(permit_cost2, comm_crosswalk1, by = "comm_name") %>% 
+  mutate(area_num_1 = as.character(comm_number))
+
+comm_shapes2 <- readOGR(".", "comm_shapes")
+comm_shapes2@data$id = rownames(comm_shapes2@data)
+comm_shapes2.points = fortify(comm_shapes2, region="area_num_1")
+comm_shapes2.df = full_join(comm_shapes2.points, comm_shapes2@data, by="id")
+comm_shapes2.df <- left_join(comm_shapes2.df, permit_cost2, by = "area_num_1") 
+ 
+ggplot(data = comm_shapes2.df,
+              aes(x = long, y = lat, group = group)) + 
+  geom_polygon(data = comm_shapes2.df, aes(fill = npermits)) +
+  scale_fill_gradient(low = "#A78F08", high = "#680A4D") +
+  theme_evelina
+  
+```
+```{r eval=FALSE, include=FALSE}
+comm_shapes1 <- readOGR(".", "comm_shapes")
+
+comm_shapes1@data$id = rownames(comm_shapes1@data)
+  comm_shapes1.points = fortify(comm_shapes1, region="area_num_1")
+  comm_shapes1.df = full_join(comm_shapes1.points, comm_shapes1@data, by="id")
+  
+comm_crosswalk1 <- 
+  comm_crosswalk %>% mutate(area_num_1 = comm_number)
+
+permit_cost1 <- 
+  left_join(permit_cost, comm_crosswalk1, by = "comm_name") %>% 
+  mutate(area_num_1 = as.character(comm_number))
+
+comm_shapes1.df <- left_join(comm_shapes1.df, permit_cost1, by = "area_num_1") 
+ 
+(mapchi <- ggplot(data = comm_shapes1.df,
+              aes(x = long, y = lat, group = group)) + 
+  geom_polygon(data = comm_shapes1.df, aes(fill = cost)) +
+  scale_fill_gradient(low = "#A78F08", high = "#680A4D") +
+  theme_evelina +
+  theme(axis.ticks = element_blank(), axis.text = element_blank()) +
+  labs(x = "", y = "", 
+       title = "\nConstruction activity patterns are changing",
+       color = "",
+       subtitle = "The hotspots in 2018 include West Town and Woodlawn community areas and \nenjoy triple of the average activity in the rest of the city",
+       caption = "Source: Building Permits, Chicago Data Portal, City of Chicago"))
+
+
+```
+
+##8
+```{r fig.height=8, fig.width=7, message=FALSE, warning=FALSE}
+license_types <- biz %>%
+  count(BUSINESS.ACTIVITY) %>%
+  mutate(food = str_detect(BUSINESS.ACTIVITY, "Food|Liquor|Deli|Fresh"),
+         retail = str_detect(BUSINESS.ACTIVITY, "Retail"),
+         construction = str_detect(BUSINESS.ACTIVITY, "Buildings|Construction|Fence|Landscaping|Flooring|Heating|Cable|Janitorial|Demolition|Excavation"),
+         biz_services = str_detect(BUSINESS.ACTIVITY, "Accounting|Financial|Consulting|Tax|Computer|Staffing"),
+         creative = str_detect(BUSINESS.ACTIVITY, "Advertising|Design|Photography|Publishing|Artist|Musician|Writer"),
+         fitness = str_detect(BUSINESS.ACTIVITY, "Fitness|Yoga|Combat|Gymnastics"),
+         factory = str_detect(BUSINESS.ACTIVITY, "Factory|Manufacturing"),
+         children = str_detect(BUSINESS.ACTIVITY, "School|Children|Children's"),
+         beauty = str_detect(BUSINESS.ACTIVITY, "Hair|Beauty|Piercing|Tattoo|Tanning"),
+         luxury = str_detect(BUSINESS.ACTIVITY, "Jewelry|Travel|Used Valuable"),
+         medical = str_detect(BUSINESS.ACTIVITY, "Medical"),
+         car = str_detect(BUSINESS.ACTIVITY, "Car"),
+         home = str_detect(BUSINESS.ACTIVITY, "Home Occ"),
+         home_clean_repair = str_detect(BUSINESS.ACTIVITY, "Cleaning|Clothing|Laundry|Dry|Home Repair")) %>%
+  mutate(biz_act = BUSINESS.ACTIVITY) %>%
+  select(-BUSINESS.ACTIVITY)
+         
+biz_comms_byclass <- biz_comms %>%
+  left_join(license_types, by = "biz_act") %>%
+  filter(!is.na(food)) %>%
+  group_by(year, comm_name) %>%
+  summarize(food = sum(food),
+            retail = sum(retail),
+            construction = sum(construction),
+            biz_services = sum(biz_services),
+            creative = sum(creative),
+            fitness = sum(fitness),
+            factory = sum(factory),
+            children = sum(children),
+            beauty = sum(beauty),
+            luxury = sum(luxury),
+            medical = sum(medical),
+            car = sum(car),
+            home = sum(home),
+            home_clean_repair = sum(home_clean_repair)) %>%
+  mutate(community = comm_name)
+
+comm_shapes2 <- st_read("comm_shapes.shp")
+
+pop_chi <- read_csv("pop_chi1.csv") %>%
+  mutate(community = toupper(GEOG))
+
+options(scipen = 999)
+
+joined_map_biz0408 <- full_join(comm_shapes2, biz_comms_byclass, by = "community") %>%
+  left_join(pop_chi, by = "community") %>%
+  filter(year <= 2008 & year >= 2004) %>%
+  group_by(community) %>%
+  summarize(food = sum(food), biz_services = sum(biz_services),
+             creative = sum(creative), luxury = sum(luxury), children = sum(children),
+            beauty = sum(beauty)) %>%
+  mutate(period = "2004-2008")
+
+joined_map_biz1418 <- full_join(comm_shapes2, biz_comms_byclass, by = "community") %>%
+  left_join(pop_chi, by = "community") %>%
+  filter(year <= 2018 & year >= 2014) %>%
+  group_by(community) %>%
+  summarize(food = sum(food), biz_services = sum(biz_services),
+             creative = sum(creative), luxury = sum(luxury), children = sum(children),
+            beauty = sum(beauty)) %>%
+  mutate(period = "2014-2018")
+
+joined_map_biz0913 <- full_join(comm_shapes2, biz_comms_byclass, by = "community") %>%
+  left_join(pop_chi, by = "community") %>%
+  filter(year <= 2013 & year >= 2009) %>%
+  group_by(community) %>%
+  summarize(food = sum(food), biz_services = sum(biz_services),
+             creative = sum(creative), luxury = sum(luxury), children = sum(children),
+            beauty = sum(beauty)) %>%
+  mutate(period = "2009-2013")
+
+joined_map_biz <- rbind(joined_map_biz0408, joined_map_biz0913, joined_map_biz1418) %>%
+  left_join(pop_chi, by = "community") %>%
+  mutate(food_norm = food / `2010_POP`,
+       biz_services_norm = biz_services / `2010_POP`,
+      creative_norm = creative / `2010_POP`,
+         luxury_norm = luxury / `2010_POP`,
+         children_norm = children / `2010_POP`,
+         beauty_norm = beauty / `2010_POP`)
+  #gather(key = "class", value = new_licenses,food:home_clean_repair) %>%
+
+(restaurants <- ggplot() + 
+  geom_sf(data = joined_map_biz, mapping = aes(fill = food)) +
+  scale_fill_continuous(high = "#A78F08", low = "#005A5B", name = "Number of business\nlicense applications\nby food and liquor serving \nestablishments") +
+    facet_wrap(~period) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  theme_evelina +
+  labs(x = "", y = "\n", 
+       title = "\nNew restaurants and bars open in the same areas \nwhere new construction happens",
+       color = "",
+       subtitle = "The number of new business license applications by food- and drink-serving \nestablishments surged in the areas of high construction activity, \nincreasingly spreading to the West and North of the Loop in the past few years",
+       caption = "Source: Business Licenses, Chicago Data Portal, City of Chicago"))
+
+ggsave("restaurants_choropleth.png", height = 8, width = 7)
+
+```
+
+Notably, license applications by new food and drinks serving establishments followed a pattern in many ways similar to that of the new construction permits. While it is hard to infer which one causes the other, it looks like construction and restaurant industry move together - both resulting from and further boosting attractiveness of the areas where they spread. In the last 15 years in Chicago, new restaurants and bars have increasingly opened in the areas to the North and West of the Loop - central business district - that have now achieved parity or nearly parity in concentration with the latter.
