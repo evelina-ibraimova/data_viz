@@ -1,18 +1,19 @@
 ---
 title: "Static Portfolio"
 author: "Evelina"
-date: "February 10, 2019"
+date: "February 12, 2019"
 output:
   html_document:
     code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("ggplot2", "tidyverse", "ggmap", "extrafont", "tidyr", "dplyr", "forcats", "sp", "sf", "rgdal", "maptools", "rgeos", "scales", "ggrepel", "treemapify", "sf", "stringr")
+list.of.packages <- c("ggplot2", "tidyverse", "ggmap", "extrafont", "tidyr", "dplyr", "forcats", "sp", "sf", "rgdal", "maptools", "rgeos", "scales", "ggrepel", "treemapify", "sf", "stringr", "Hmisc")
 
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
+library(Hmisc)
 library(stringr)
 library(tidyverse)
 library(ggplot2)
@@ -81,7 +82,7 @@ theme_evelina <- theme(panel.background = element_rect("#EBF1DE"),
  
 ```
 
-Research points to evidence that urban blight is bad for cities. It is associated with increased crime and seems to affect physical and emotional health of people residing near abandoned buildings. Visualizations below illustrate which parts of Chicago have been affected and explore relationships between blight and economic activity.
+This portfolio illustrates the physical state of Chicago and how it has evolved since mid-2000s. It also explores relationships between the physical evolution and development, looking for potential links between blight, new construction, and economic activity.
 
 ##1 
 ```{r map, message=FALSE, warning=FALSE, fig.width=9,fig.height=7}
@@ -206,9 +207,11 @@ joined <- left_join(comm_crosswalk, permit_cost, by = "comm_name")
 joined2 <- left_join(joined, blight18_sum, by = "comm_number")
 
 (blight_construction_heat <- ggplot(joined2, aes(n, npermits)) +
-  stat_bin2d(aes(fill = stat(count))) +
+  #stat_bin2d(aes(fill = stat(count))) +
+    geom_point(color = "#6EB5B5") +
+    stat_smooth(method = "lm", formula = npermits ~ n + (n^2), size = 1) +
   theme_evelina +  
-  scale_fill_gradient(low = "#6EB5B5", high = "#103636") +
+  #scale_fill_gradient(low = "#6EB5B5", high = "#103636") +
      labs(x = "Number of vacant of abandoned buildings reported in 2018", 
           y = "Number of new construction \nand renovation permits in 2018", 
           fill = "Number of \ncommunity areas",
@@ -479,11 +482,11 @@ label18 <- paste(biz_comms_decade$area, comma_format()(round(biz_comms_decade$`2
   geom_text_repel(label = label18, y = biz_comms_decade$`2018`, x = 2018, 
             hjust = -0.5, vjust = 1, size = 3, family = "Bodoni MT") +
   labs(x = "", y = "\n", 
-       title = "\nNew business activity seems to be shifting from \nthe center of Chicago to surrounding areas",
+       title = "\nNew business activity seems to be shifting from \nthe center of Chicago to West and North",
        color = "",
        subtitle = "Despite the general trend of reduction in new business license applications -\n which may be a result of the Great Depression and a recent deregulation - \nthere is visible heterogeneity among the different areas",
        caption = "Source: Building Permits, Chicago Data Portal, City of Chicago") +
-    expand_limits(x = c(2007.5, 2017.5)) +
+    expand_limits(x = c(2007, 2019)) +
     scale_x_continuous(breaks = c(2008, 2018), labels = c("2008", "2018")))
   
 ggsave("business_slopes.png", width = 7, height = 10)
@@ -632,7 +635,8 @@ joined_map_biz0408 <- full_join(comm_shapes2, biz_comms_byclass, by = "community
   left_join(pop_chi, by = "community") %>%
   filter(year <= 2008 & year >= 2004) %>%
   group_by(community) %>%
-  summarize(food = sum(food), biz_services = sum(biz_services),
+  summarize(retail = sum(retail),
+            food = sum(food), biz_services = sum(biz_services),
              creative = sum(creative), luxury = sum(luxury), children = sum(children),
             beauty = sum(beauty)) %>%
   mutate(period = "2004-2008")
@@ -641,7 +645,7 @@ joined_map_biz1418 <- full_join(comm_shapes2, biz_comms_byclass, by = "community
   left_join(pop_chi, by = "community") %>%
   filter(year <= 2018 & year >= 2014) %>%
   group_by(community) %>%
-  summarize(food = sum(food), biz_services = sum(biz_services),
+  summarize(retail = sum(retail), food = sum(food), biz_services = sum(biz_services),
              creative = sum(creative), luxury = sum(luxury), children = sum(children),
             beauty = sum(beauty)) %>%
   mutate(period = "2014-2018")
@@ -650,7 +654,7 @@ joined_map_biz0913 <- full_join(comm_shapes2, biz_comms_byclass, by = "community
   left_join(pop_chi, by = "community") %>%
   filter(year <= 2013 & year >= 2009) %>%
   group_by(community) %>%
-  summarize(food = sum(food), biz_services = sum(biz_services),
+  summarize(retail = sum(retail), food = sum(food), biz_services = sum(biz_services),
              creative = sum(creative), luxury = sum(luxury), children = sum(children),
             beauty = sum(beauty)) %>%
   mutate(period = "2009-2013")
@@ -683,3 +687,46 @@ ggsave("restaurants_choropleth.png", height = 8, width = 7)
 ```
 
 Notably, license applications by new food and drinks serving establishments followed a pattern in many ways similar to that of the new construction permits. While it is hard to infer which one causes the other, it looks like construction and restaurant industry move together - both resulting from and further boosting attractiveness of the areas where they spread. In the last 15 years in Chicago, new restaurants and bars have increasingly opened in the areas to the North and West of the Loop - central business district - that have now achieved parity or nearly parity in concentration with the latter.
+
+##9 
+```{r fig.height=7, fig.width=8, message=FALSE, warning=FALSE}
+pre_corr_matrix <- biz_comms_byclass %>%
+filter(year == 2018) %>%
+  select(-year, -comm_name, -community) 
+
+corr_matrix <- rcorr(as.matrix(pre_corr_matrix))
+
+flatten_cor_matrix <- function(cormat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut]
+    )
+}
+
+flat_cor_matrix <- flatten_cor_matrix(corr_matrix$r) %>% 
+  filter(row != "year") %>% mutate(cor = as.numeric(cor))
+
+(tiles_corr_by_industry <- ggplot() +
+  geom_tile(data = flat_cor_matrix, 
+            mapping = aes(x = as.factor(row), y = as.factor(column), fill = cor)) +
+  geom_tile(data = flat_cor_matrix, 
+            mapping = aes(y = as.factor(row), x = as.factor(column), fill = cor)) +
+  scale_fill_gradient2(high = "#005A5B", mid = "#11A6A7") +
+  theme_evelina +  
+  theme(panel.grid.major.y = element_blank(), plot.title = element_text(hjust = 0.45), plot.subtitle = element_text(hjust = 0.8), plot.caption = element_text(hjust = 1.8), axis.text.x = element_text(angle = 90, vjust = 1)) +
+  #scale_fill_gradient(low = "#6EB5B5", high = "#103636") +
+     labs(x = "", 
+          y = "", 
+          fill = "Correlation between\nnew license applications per\ncommunity area by\nbusiness activity\nin Chicago, 2018",
+       title = "\nBusiness services, creative, and luxury firms move together",
+       subtitle = "So do retail, beauty, and home repair and cleaning services. Factory \nand hospitals have different location patterns from most other businesses.",
+       caption = "Source: Business Licenses - Chicago Data Portal, City of Chicago"))
+
+ggsave("tiles_corr_by_industry.png", height = 7, width = 8)
+
+
+```
+
+The heat map above reveals location decision patterns in Chicago that could help us think about economic development in geographical dimensions. In 2018, we can see a high correlation in the data between new business licenses for creative industry firms (e.g. art, music, publishing, advertising), business services firms (e.g. consulting, accounting, staffing), and luxury firms (jewerly and antique stores, travel agencies) decisions to locate in certain community areas. Importantly, the correlation was high on average and close across most of industry pairs - meaning that certain areas must be popular among firms dealing with all kinds of business. The only exceptions from the rule were manufacturing and medical firms that had way lower correlation coefficients for their location decisions, when paired with other firms.
